@@ -20,34 +20,156 @@ knitr::opts_chunk$set(message=FALSE,warning=FALSE, cache=TRUE)
 
 This is an `.Rmd` file. It is plain text with special features. Any time you write just like this, it will be compiled to normal text in the website. If you put a \# in front of your text, it will create a top level-header.
 
-# Getting started
+# First challenge - Sales data analysis 
+Date: 2020-28-11
+Data Science Basic - WiSe 2020/21  
 
-This is the first trail after finally getting the passcode set. 
+## Preperation
 
-
-## Second level header
-
-You can add more headers by adding more hashtags. These won't be put into the table of contents
-
-### third level header
-
-Here's an even lower level header
-
-# My second post (note the order)
-
-Last compiled: `r Sys.Date()`
-
-I'm writing this tutorial going from the top down. And, this is how it will be printed. So, notice the second post is second in the list. If you want your most recent post to be at the top, then make a new post starting at the top. If you want the oldest first, do, then keep adding to the bottom
-
-# Adding R stuff
-
-So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
-
-So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
+### Clear the environment and load packages 
 
 ```{r}
-samples <- rnorm(100, mean=0, sd=1)
-hist(samples)
+rm(list=ls())#Clear list
+#install.packages("lubridate") #installed the packeges once in the beginning
+#install.packages("writexl")
+
+####Load libraries
+library(tidyverse)
+library("readxl")
+library(lubridate)
+library("writexl")
+library(ggplot2)
+library(scales)
 ```
 
-When you knit this R Markdown document, you will see that the histogram is printed to the page, along with the R code. This document can be set up to hide the R code in the webpage, just delete the comment (hashtag) from the cold folding option in the yaml header up top. For purposes of letting yourself see the code, and me see the code, best to keep it the way that it is. You'll learn that all of these things and more can be customized in each R code block.
+### Importing Files
+
+```{r}
+Bikes<-read_excel("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/01_raw_data/bikes.xlsx")
+Bikeshops<-read_excel("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/01_raw_data/bikeshops.xlsx")
+Orderlines<-read_excel("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/01_raw_data/orderlines.xlsx")
+```
+
+### Joining Data
+
+```{r}
+Summary_table2 <- Orderlines %>% left_join(Bikes, by = c("product.id" = "bike.id"))%>% left_join(Bikeshops, by = c("customer.id" = "bikeshop.id"))
+glimpse(Summary_table2, eval=TRUE)
+```
+
+## Wrangling and shortening Data
+
+### Wrangling data
+
+```{r}
+wrangled_table2<-Summary_table2 %>% 
+  separate(col = location, into = c("city", "state_of_sale"),sep = ", ", convert = T) %>% 
+  mutate(Total_Amount = quantity*price)%>% 
+  select(contains("order"), contains("model"), contains("category"),price, quantity, Total_Amount, everything())%>%  
+  rename(bikeshop = name) %>%set_names(names(.) %>% str_replace_all("\\.", "_"))
+glimpse(wrangled_table2, eval=TRUE)
+```
+
+### Rearranging and shortening wrangled Data
+
+```{r}
+Short_table2<-wrangled_table2%>%  select(order_id, order_date, city, state_of_sale, price, quantity, Total_Amount)
+glimpse(Short_table2, eval=TRUE)
+```
+
+## Business Insights
+
+### Sales by Location
+
+#### Step 1 - Manipulate
+
+```{r}
+sales_by_Location<- Short_table2%>%  
+  select(state_of_sale, Total_Amount)%>%
+  group_by(state_of_sale)%>% 
+  summarize(sales = sum(Total_Amount))%>% 
+  mutate(sales_in_Euro = scales::dollar(sales, big.mark = ".", 
+                                        decimal.mark = ",", 
+                                        prefix = "", 
+                                        suffix = " €"))
+glimpse(sales_by_Location, eval=TRUE)
+```
+
+#### Step 2 - Visualize
+
+```{r, fig.width=10, fig.height=10}
+sales_by_Location%>%
+  ggplot(aes(x = state_of_sale, y = sales)) +
+  geom_col(fill = "blue") + 
+  geom_label(aes(label = sales_in_Euro)) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_y_continuous(labels = scales::dollar_format(big.mark = ".", 
+                                                    decimal.mark = ",", 
+                                                    prefix = "", 
+                                                    suffix = " €")) + #adjusting to Euros
+  labs(title = "Revenue of bike sales by location",
+       subtitle = "Bike stores available in 12 states",
+       x = "", y = "Revenue")
+```
+
+### Sales by Year and Location
+
+##### Step 1 - Manipulate
+
+```{r}
+sales_year_Location<- Short_table2%>%  
+  select(order_date, Total_Amount, state_of_sale)%>%
+  mutate(year=year(order_date))%>%
+  group_by(year, state_of_sale)%>% 
+  summarize(sales = sum(Total_Amount))%>% 
+  ungroup() %>%
+  mutate(sales_in_Euro = scales::dollar(sales, big.mark = ".", 
+                                        decimal.mark = ",", 
+                                        prefix = "", 
+                                        suffix = " €"))
+glimpse(sales_year_Location, eval=TRUE)
+```
+
+#### Step 2 - Visualize
+
+```{r, fig.width=10, fig.height=10}
+sales_year_Location%>%
+  ggplot(aes(x = year, y = sales, fill = state_of_sale)) +
+  geom_col() + 
+  facet_wrap(~ state_of_sale) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_y_continuous(labels = scales::dollar_format(big.mark = ".", 
+                                                    decimal.mark = ",", 
+                                                    prefix = "", 
+                                                    suffix = " €")) +
+  labs(title = "Trend of bike sale in 12 states of Germany",
+       subtitle = "Overall positive trends - North Rhine-Westphalia with most revenues",
+       fill = "State")
+```
+
+## Writing Files 
+
+### Excel
+
+```{r}
+wrangled_table2 %>%
+  write_xlsx("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/02_wrangled_data/bike_orderlines_wrangled2.xlsx")
+```
+
+### CSV
+
+```{r}
+wrangled_table2 %>% 
+  write_csv("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/02_wrangled_data/bike_orderlines_wrangled2.csv")
+```
+
+### RDS
+
+```{r}
+wrangled_table2 %>% 
+  write_rds("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/02_wrangled_data/bike_orderlines_wrangled2.rds")
+```
+
+
+
+# Second Challenge - Data Acquisition  
