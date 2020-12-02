@@ -35,11 +35,12 @@ rm(list=ls())#Clear list
 
 ####Load libraries
 library(tidyverse)
-library("readxl")
+library(readxl)
 library(lubridate)
-library("writexl")
+library(writexl)
 library(ggplot2)
 library(scales)
+library(knitr)
 ```
 
 ### Importing Files
@@ -172,4 +173,261 @@ wrangled_table2 %>%
 
 
 
-# Second Challenge - Data Acquisition  
+# Second Challenge - Data Acquisition 
+
+For now, I am not able to perform this Challenge. I am really (REALLY!) beginner in programming, which means I actually have not done any programming before. Chapter 1 and 2 were okish, but now Chapter 3 is just too much. I know there is Mattermost, but I do not even know what to ask as I have no idea so far what to do and where to start. I will reread the theoretical part and retry next weekend, but might be that I just cannot fulfill this Challenge.
+I continued with Part 4 - Data Wrangling which seems to be a bit lighter and easier to understand. 
+
+# Third Challenge - Data Wrangling 
+
+## Preparation 
+
+### Loading Libraries and packages, clear list 
+
+```{r}
+rm(list=ls())#Clear list
+#install.packages("vroom")
+#install.packages("tictoc")
+#install.packages("stargazer")
+library(tidyverse)
+library(vroom)
+library(data.table)
+library(tictoc)
+library(data.table)
+library(knitr)
+```
+
+### Loading and Importing patent data 
+
+```{r}
+col_types_patent <- list(
+  id                        = col_character(), #patent_id
+  type                      = col_skip(), #not needed
+  number                    = col_skip(), #not needed
+  country                   = col_skip(), #not needed
+  date                      = col_date("%Y-%m-%d"),
+  abstract                  = col_skip(), #not needed
+  title                     = col_skip(), #not needed
+  kind                      = col_skip(), #not needed
+  num_claims                = col_skip(), #not needed
+  filename                  = col_skip(), #not needed
+  withdrawn                 = col_skip()  #not needed
+)
+patent_table <- vroom(
+  file       = "E:/Uni Hamburg/DataScience/patent.tsv/patent.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_patent,
+  na         = c("", "NA", "NULL")
+)
+# Rename id to patent_id
+setnames(patent_table, "id", "patent_id")
+glimpse(patent_table, eval = TRUE)
+```
+
+### Loading and importing Patent_assignee data
+
+```{r}
+col_types_patent_assignee <- list(
+  patent_id                 = col_character(),
+  assignee_id               = col_character(),
+  location_id               = col_skip() #not needed
+)
+
+patent_assignee_table <- vroom(
+  file       = "E:/Uni Hamburg/DataScience/patent_assignee.tsv/patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_patent_assignee,
+  na         = c("", "NA", "NULL")
+)
+glimpse(patent_assignee_table, eval = TRUE)
+```
+
+### Loading and importing assignee data
+
+```{r}
+col_types_assignee <- list(
+  id                        = col_character(), #assignee_id
+  type                      = col_double(), 
+  name_first                = col_skip(), #not needed
+  name_last                 = col_skip(), #not needed
+  organization              = col_character()
+)
+
+assignee_table <- vroom(
+  file       = "E:/Uni Hamburg/DataScience/assignee.tsv/assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_assignee,
+  na         = c("", "NA", "NULL")
+)
+setnames(assignee_table, "id", "assignee_id")
+glimpse(assignee_table, eval = TRUE)
+```
+
+### Loading and importing USPC Data - USPTO patent classification at patent issue date
+
+```{r}
+col_types_uspc <- list(
+  uuid                      = col_skip(), #not needed
+  patent_id                 = col_character(),
+  mainclass_id              = col_double(),
+  subclass_id               = col_skip(), #not needed
+  sequence                  = col_skip() #not needed
+)
+
+uspc_table <- vroom(
+  file       = "E:/Uni Hamburg/DataScience/uspc.tsv/uspc.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_uspc,
+  na         = c("", "NA", "NULL")
+)
+glimpse(uspc_table, eval = TRUE)
+```
+
+## Make a data.table out of the imported data
+
+### Patent table
+
+```{r}
+class(patent_table)%>%
+  glimpse(, eval =TRUE)
+setDT(patent_table)
+class(patent_table)%>%
+  glimpse(, eval =TRUE)
+```
+
+### Patent_assignee table
+
+```{r}
+setDT(patent_assignee_table)
+class(patent_assignee_table)%>%
+  glimpse(, eval =TRUE)
+```
+
+### Assignee table
+
+```{r}
+setDT(assignee_table)
+class(assignee_table)%>%
+  glimpse(, eval =TRUE)
+```
+
+### uspc table
+
+```{r}
+setDT(uspc_table)
+class(uspc_table)%>%
+  glimpse(, eval =TRUE)
+```
+
+## Joining data 
+
+### Task 1: Assignee & Patent Assignee
+
+```{r}
+combined_data1 <- merge(x = patent_assignee_table, y = assignee_table, 
+                        by    = "assignee_id", 
+                        all.x = TRUE, 
+                        all.y = TRUE)%>%
+  filter(!is.na(patent_id)) %>%
+  glimpse(, eval = TRUE)
+```
+
+### Task 2: Assignee & Patent Assignee & Patent
+
+```{r}
+combined_data2<- merge(x=combined_data1, y = patent_table,
+                       by    = "patent_id", 
+                       all.x = TRUE, 
+                       all.y = TRUE)%>%
+  filter(!is.na(patent_id))%>%
+  glimpse(, eval = TRUE)
+```
+
+### Task 3: Assignee & Patent Assignee & Patent
+
+```{r}
+combined_data3<- merge(x=combined_data1, y = uspc_table,
+                       by    = "patent_id", 
+                       all.x = TRUE, 
+                       all.y = TRUE)%>%
+  filter(!is.na(patent_id))%>%
+  filter(!is.na(mainclass_id))%>%
+  filter(!is.na(organization))%>%
+  select(patent_id, mainclass_id, organization)%>%
+  glimpse(, eval = TRUE)
+```
+
+## Challenge Tasks
+
+### Task 1: Patent Dominance: What US company / corporation has the most patents? List the 10 US companies with the most assigned/granted patents.
+
+```{r}
+most_patents<-combined_data1 %>% 
+  filter(type == 2)%>%
+  count(organization, sort = T)
+setnames(most_patents, "n", "number of patents")
+```
+
+The top 10 US companies / corporation with the most patents are the following:
+
+```{r results = 'asis'}
+Most<-most_patents[1:10, ]
+knitr::kable(
+  head(Most[,],10), booktabs = TRUE,
+  caption = 'The top 10 innovative companies / corporation in the US with most new patents'
+)
+```
+
+### Task 2: Recent patent activity: What US company had the most patents granted in 2019? List the top 10 companies with the most new granted patents for 2019.
+
+```{r}
+most_patents2019<-combined_data2 %>% 
+  separate(col = date, into = c("year", "month", "day"), sep = "-", convert = T)%>%
+  filter(year == 2019)%>%
+  filter(type == 2)%>%
+  count(organization, sort = T)
+
+setnames(most_patents2019, "n", "number of patents")%>%
+  glimpse(, eval=TRUE)
+```
+
+The top 10 US companies with the most new granted patents for 2019 are the following:
+
+```{r results = 'asis'}
+Top10_2019<-most_patents2019[1:10,]
+knitr::kable(
+  head(Top10_2019[,],10), booktabs = TRUE,
+  caption = 'The top 10 innovative companies in the US with most new granted  patents in 2019'
+)
+``` 
+
+### Task 3: Innovation in Tech: What is the most innovative tech sector? For the top 10 companies (worldwide) with the most patents, what are the top 5 USPTO tech main classes?
+
+```{r}
+USPTO_worldwide<-combined_data3 %>%
+  count(organization, sort = T)
+
+setnames(USPTO_worldwide, "n", "number of patents")%>%
+  glimpse(, eval=TURE)
+
+Top10_worldwide<-USPTO_worldwide[1:10,]
+
+Top_USPTO<- merge(x=Top10_worldwide, y = combined_data3, 
+                  by = "organization",
+                  all.x = TRUE, 
+                  all.y = FALSE)%>%
+  count(mainclass_id, sort = T)
+setnames(Top_USPTO, "n", "USPTO tech main class occurency")%>%
+  glimpse(, eval=TRUE)
+```
+
+The top 10 companies worldwide with the most patents including the top 5 USPTO tech main classes:
+
+```{r results = 'asis'}
+Top10<-head(USPTO_worldwide, 10)
+Top<-head(Top_USPTO, 5)
+knitr::kable(
+  list(Top10, Top),
+  caption = 'The top 10 innovative companies worldwide holding most of the patents (left) and the top 5 USPTO tech main classes (right)'
+)
+```
