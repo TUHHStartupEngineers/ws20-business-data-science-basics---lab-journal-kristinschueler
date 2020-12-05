@@ -16,10 +16,6 @@ output:
 knitr::opts_chunk$set(message=FALSE,warning=FALSE, cache=TRUE)
 ```
 
-**IMPORTANT:** You can delete everything in here and start fresh. You might want to start by not deleting anything above this line until you know what that stuff is doing.
-
-This is an `.Rmd` file. It is plain text with special features. Any time you write just like this, it will be compiled to normal text in the website. If you put a \# in front of your text, it will create a top level-header.
-
 # First challenge - Sales data analysis 
 Date: 2020-28-11
 Data Science Basic - WiSe 2020/21  
@@ -193,7 +189,6 @@ library(tidyverse)
 library(vroom)
 library(data.table)
 library(tictoc)
-library(data.table)
 library(knitr)
 ```
 
@@ -353,7 +348,7 @@ combined_data3<- merge(x=combined_data1, y = uspc_table,
   filter(!is.na(patent_id))%>%
   filter(!is.na(mainclass_id))%>%
   filter(!is.na(organization))%>%
-  select(patent_id, mainclass_id, organization)%>%
+  select(type, mainclass_id, organization)%>%
   glimpse(, eval = TRUE)
 ```
 
@@ -405,6 +400,7 @@ knitr::kable(
 
 ```{r}
 USPTO_worldwide<-combined_data3 %>%
+  filter((type == 2) | (type == 3))%>%
   count(organization, sort = T)
 
 setnames(USPTO_worldwide, "n", "number of patents")%>%
@@ -430,4 +426,176 @@ knitr::kable(
   list(Top10, Top),
   caption = 'The top 10 innovative companies worldwide holding most of the patents (left) and the top 5 USPTO tech main classes (right)'
 )
+```
+
+# Forth Challenge: Visualization
+
+## Preparation
+```{r}
+#Clear the environment and load packages 
+rm(list=ls())#Clear list
+#install.packages("date")
+#install.packages("maps")
+
+#Load libraries
+library(tidyverse)
+library(scales)
+library(lubridate)
+library(date)
+library(maps)
+library(data.table)
+
+#Load data
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+``` 
+
+## Task 1: Map the time course of the cumulative Covid-19 cases
+
+### Cases per Countries of Choice
+
+#### Data manipulation
+```{r}
+glimpse(covid_data_tbl, eval=TRUE)
+
+countries_of_interest<-c("Germany","France","Spain","United_Kingdom","United_States_of_America")
+
+Cases_Countries<-covid_data_tbl%>%
+  rename(Country = countriesAndTerritories) %>%
+  filter(year == 2020)%>%
+  filter(month != 12)%>%
+  filter(Country == countries_of_interest)%>%
+  select(month, cases, Country)%>%
+  group_by(Country, month)%>%
+  summarize(Monthly_cases_country = sum(cases))%>%
+  mutate(Cum_Mon_cases_country = cumsum(Monthly_cases_country))%>%
+  glimpse(, eval=TRUE)
+```
+
+#### Data visualization 
+
+```{r results = 'asis'}
+Cases_Countries %>%
+  ggplot(aes(month, Cum_Mon_cases_country,color = Country))+
+  geom_line(aes(color = Country), size = 1) +
+  geom_point(aes(color = Country), size = 3) +
+  scale_x_continuous(breaks = 1:11, labels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November"))+
+  scale_y_continuous(labels = scales::comma_format(scale = 1e-6, 
+                                                    suffix = "Mio."),limits = c(0,3e6)) +
+  theme(axis.text.x=element_text(angle = 60, hjust = 0.95))+
+  labs(
+    title = "Corona Cases in 2020",
+    subtitle = "Continously increasing number of Corona cases in 5 selected countries",
+    x = "Year 2020",
+    y = "Cumulative Covid-19 Cases",
+    caption = str_glue("Data captured from https://opendata.ecdc.europa.eu/covid19/casedistribution")
+  )+
+  geom_label(label =  str_glue(
+    "{max(Cases_Countries$Cum_Mon_cases_country)}"),
+               vjust = 0.25, 
+               nudge_y = -1.5,
+               nudge_x = -1.5,
+               size  =  4,
+               fill  = "white",
+               color = "black",
+               fontface = "italic",
+               data = Cases_Countries%>%
+                 filter(month == "11")%>%
+                 filter(Country == "United_States_of_America")
+  )
+```
+
+### Cases for Continents
+
+#### Data manipulation
+
+```{r}
+Cases_Continents<-covid_data_tbl%>%
+  rename(Continent = continentExp) %>%
+  filter(year == 2020)%>%
+  select(month, cases, Continent)%>%
+  group_by(Continent, month)%>%
+  summarize(Monthly_cases_continent = sum(cases))%>%
+  mutate(Cum_Mon_cases_continent = cumsum(Monthly_cases_continent))%>%
+  glimpse(, eval=TRUE)
+```
+
+#### Data visualisation 
+
+```{r results = 'asis'}
+Cases_Continents %>%
+  ggplot(aes(month, Cum_Mon_cases_continent, color = Continent))+
+  geom_line(aes(color = Continent), size = 1) +
+  geom_point(aes(color = Continent), size = 3) +
+  scale_x_continuous(breaks = 1:11, labels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November"))+
+  scale_y_continuous(labels = scales::comma_format(scale = 1e-6, 
+                                                   suffix = "Mio.", limits = c(0,30e6))) +
+  theme(axis.text.x=element_text(angle = 60, hjust = 0.95))+
+  labs(
+    title = "Corona Cases in 2020",
+    subtitle = "Continously increasing number of Corona cases per Continents worldwide",
+    x = "Year 2020",
+    y = "Cumulative Covid-19 Cases",
+    caption = str_glue("Data captured from https://opendata.ecdc.europa.eu/covid19/casedistribution")
+  )+
+  geom_label(label =  str_glue(
+    "{max(Cases_Continents$Cum_Mon_cases_continent)}"),
+    vjust = -0.5, 
+    size  =  4,
+    fill  = "white",
+    color = "black",
+    fontface = "italic",
+    data = Cases_Continents%>% filter(month == "11")
+    )
+```
+
+## Task 2:Visualize the distribution of the mortality rate (deaths / population) with geom_map().
+
+### Data Manipulation 
+
+```{r}
+world <- map_data("world")%>%
+  glimpse(,eval=TRUE)
+
+Covid_data<- covid_data_tbl%>% 
+  mutate(across(countriesAndTerritories, str_replace_all, "_", " ")) %>%
+  mutate(countriesAndTerritories = case_when(
+    countriesAndTerritories == "United Kingdom" ~ "UK",
+    countriesAndTerritories == "United States of America" ~ "USA",
+    countriesAndTerritories == "Czechia" ~ "Czech Republic",
+    TRUE ~ countriesAndTerritories
+    ))%>%
+  rename(region = countriesAndTerritories) %>%
+  select(deaths, popData2019, region, geoId)%>%
+  group_by(region)%>%
+  mutate(Mortality_Rate = sum(deaths)/popData2019*1000)%>%
+  unique()%>%
+  glimpse(,eval=TRUE)
+
+Location<- merge(x = Covid_data, y = world,
+                 by = "region",
+                 all.x = T,
+                 all.y = T)
+  
+class(Location)%>%
+  glimpse(, eval =TRUE)
+
+```
+
+### Data visualisation 
+
+#### Preparation
+
+```{r results = 'asis'}
+Location%>%
+  ggplot(aes(fill = Mortality_Rate))+
+  geom_map(aes(map_id = geoId), map = world)+
+  scale_fill_viridis_c(option = "plasma", 
+                       trans = "sqrt"
+  )+
+  labs(
+    title = "Mortality Rate worldwide [in Promille]",
+    subtitle = "Mortality rate especially in the United States of America and Southern American countries drastically high",
+    caption = str_glue("Data captured from https://opendata.ecdc.europa.eu/covid19/casedistribution")
+  )
+
 ```
