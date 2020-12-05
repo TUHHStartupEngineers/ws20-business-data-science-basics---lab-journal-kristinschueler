@@ -428,7 +428,7 @@ knitr::kable(
 )
 ```
 
-# Forth Challenge: Visualization
+# Forth Challenge - Visualization
 
 ## Preparation
 ```{r}
