@@ -599,3 +599,9 @@ Location%>%
   )
 
 ```
+
+# Feedback
+
+Gerne möchte ich Ihnen ein kurzes Feedback zu dem Kurs geben. Zunächst einmal habe ich vieles gelernt, was mir tatsächlich auch in anderen Kursen geholfen hat, Aufgaben in R schneller zu bewältigen. Allerdings fand ich insbesondere das Kapitel 3 sehr schwer verständlich für jemanden ohne jegliche Programmierkenntnisse - was laut Kursbeschreibung nicht benötigt war. Ich war bereits kurz davor, den Kurs abzubrechen, habe dann aber mit den Kapiteln 4 und 5 weitergemacht und das dritte Kapitel zunächst übersprungen. Vielleicht könnte dieses genauer beschrieben oder vereinfacht werden. Uns steht selbstverständlich Matterhorn zur Verfügung, allerdings war das Kapitel einfach zu überwältigend mit den vielen neuen Begriffen etc., dass ich gar nicht wusste, nach was ich fragen sollte. 
+Auch das Kapitel 1 mit der Installation ist teilweise schwer verständlich. Ich wusste zum Beispiel noch nicht mal was "mein Terminal" ist und hatte so bei der Installation Probleme. 
+Letztlich habe ich fast alle Aufgaben gemeistert mit nicht unerheblichem Zeitaufwand. Das war einer der Gründe, weshalb ich mich zuletzt auch aus dem Nachfolgekurs "Machine Learning" wieder ausgetragen habe. 
