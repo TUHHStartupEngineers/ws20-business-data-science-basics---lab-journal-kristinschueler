@@ -167,12 +167,103 @@ wrangled_table2 %>%
   write_rds("C:/Users/Kristin/Documents/Working directory/00_data/01_bike_sales/02_wrangled_data/bike_orderlines_wrangled2.rds")
 ```
 
-
-
 # Second Challenge - Data Acquisition 
 
-For now, I am not able to perform this Challenge. I am really (REALLY!) beginner in programming, which means I actually have not done any programming before. Chapter 1 and 2 were okish, but now Chapter 3 is just too much. I know there is Mattermost, but I do not even know what to ask as I have no idea so far what to do and where to start. I will reread the theoretical part and retry next weekend, but might be that I just cannot fulfill this Challenge.
-I continued with Part 4 - Data Wrangling which seems to be a bit lighter and easier to understand. 
+```{r results = 'asis'}
+rm(list=ls())#Clear list
+library(httr)
+library(jsonlite)
+library(glue)
+library(rvest)
+```
+
+#### Function to get easily API pathes
+```{r}
+sw_api_path <- function(path) {
+  url <- paste("https://api.openbrewerydb.org/breweries",{path}, sep="")
+  print(url)
+  resp <- GET(url)
+  print(resp)
+  return (stop_for_status(resp))
+}
+resp <- sw_api_path('?by_city=hamburg')
+```
+
+```{r results = 'asis'}
+Data<-resp %>%
+  .$content %>%
+  rawToChar() %>%
+  fromJSON()%>%
+  as_tibble()%>%
+  glimpse(eval=T)
+
+Data$id
+Data$name
+Data$brewery_type
+```
+
+## Task 2: Bike scraping
+
+### Preparation
+```{r}
+rm(list=ls())#Clear list
+library(httr)
+library(jsonlite)
+library(glue)
+library(rvest)
+library(tidyverse)
+library(knitr)
+```
+
+### Data collection
+```{r}
+get_bikes_data <- function(resp){
+  all_bikes <- data_frame()
+  l <- resp %>%
+    read_html() %>%
+    html_nodes(css = "body > div > main > catalog-category-bikes-level-2 > catalog-category-bikes > div") %>%
+    length()
+  
+  vec <- seq(2, l, by=2)
+  
+  for (i in vec) {
+    
+    bikes <- resp %>%
+      read_html() %>%
+      html_nodes(css = paste("body > div > main > catalog-category-bikes-level-2 > catalog-category-bikes > div:nth-child(",i,") > div > ul > li", sep="")) %>%
+      map_df(~{
+        tibble(
+          name = html_node(.x, "div > div > div.catalog-category-bikes__title > span") %>% html_text(trim=TRUE),
+          price = html_node(.x, "div > div > div.catalog-category-bikes__price > div.catalog-category-bikes__price-title") %>% html_text(trim=TRUE) %>% str_remove(pattern = "ab ")
+        )
+      })
+    
+    all_bikes <- rbind(all_bikes, bikes)
+  }
+  return(all_bikes)
+}
+```
+
+### visualisation
+```{r results = 'asis'}
+url <- "https://www.rosebikes.de/fahrr%C3%A4der/rennrad"
+resp <- GET(url)
+bikesRenn <- get_bikes_data(resp)
+
+knitr::kable(
+  head(bikesRenn[,],10), booktabs = TRUE,
+  caption = 'Road bikes'
+)
+
+url <- "https://www.rosebikes.de/fahrr%C3%A4der/Gravel"
+resp <- GET(url)
+bikesGravel <- get_bikes_data(resp)
+
+knitr::kable(
+  head(bikesGravel[,],10), booktabs = TRUE,
+  caption = 'Gravel bikes'
+)
+```
 
 # Third Challenge - Data Wrangling 
 
@@ -515,8 +606,7 @@ Cases_Continents<-covid_data_tbl%>%
   select(month, cases, Continent)%>%
   group_by(Continent, month)%>%
   summarize(Monthly_cases_continent = sum(cases))%>%
-  mutate(Cum_Mon_cases_continent = cumsum(Monthly_cases_continent))%>%
-  glimpse(, eval=TRUE)
+  mutate(Cum_Mon_cases_continent = cumsum(Monthly_cases_continent))
 ```
 
 #### Data visualisation 
@@ -545,7 +635,7 @@ Cases_Continents %>%
     color = "black",
     fontface = "italic",
     data = Cases_Continents%>% filter(month == "11")
-    )
+  )
 ```
 
 ## Task 2:Visualize the distribution of the mortality rate (deaths / population) with geom_map().
@@ -556,6 +646,10 @@ Cases_Continents %>%
 world <- map_data("world")%>%
   glimpse(,eval=TRUE)
 
+world_short <- world%>%
+  select(long, lat, region)%>%
+  glimpse(,eval=TRUE)
+
 Covid_data<- covid_data_tbl%>% 
   mutate(across(countriesAndTerritories, str_replace_all, "_", " ")) %>%
   mutate(countriesAndTerritories = case_when(
@@ -563,32 +657,28 @@ Covid_data<- covid_data_tbl%>%
     countriesAndTerritories == "United States of America" ~ "USA",
     countriesAndTerritories == "Czechia" ~ "Czech Republic",
     TRUE ~ countriesAndTerritories
-    ))%>%
+  ))%>%
   rename(region = countriesAndTerritories) %>%
   select(deaths, popData2019, region, geoId)%>%
   group_by(region)%>%
   mutate(Mortality_Rate = sum(deaths)/popData2019*1000)%>%
-  unique()%>%
+  select(Mortality_Rate, region)%>%
   glimpse(,eval=TRUE)
 
-Location<- merge(x = Covid_data, y = world,
+Location<- merge(x = world_short, y = Covid_data,
                  by = "region",
                  all.x = T,
-                 all.y = T)
-  
-class(Location)%>%
-  glimpse(, eval =TRUE)
-
+                 all.y = T)%>%
+  glimpse(,eval=TRUE)
 ```
 
 ### Data visualisation 
-
-#### Preparation
+Unfortuantely, there is a mistake in the code which leads to a bad visual output. I did not find my mistake, which makes me display the best I have reached. I tried to not select values from the "world" data as I thought its due to my selection for Location. Unfortunately, I cannot process the data anymore thereafter as its leading to the error: "Fehler: kann Vektor der Größe 1.7 GB nicht allozieren"
 
 ```{r results = 'asis'}
 Location%>%
   ggplot(aes(fill = Mortality_Rate))+
-  geom_map(aes(map_id = geoId), map = world)+
+  geom_map(aes(long, lat, map_id = region), map = world)+
   scale_fill_viridis_c(option = "plasma", 
                        trans = "sqrt"
   )+
@@ -597,11 +687,14 @@ Location%>%
     subtitle = "Mortality rate especially in the United States of America and Southern American countries drastically high",
     caption = str_glue("Data captured from https://opendata.ecdc.europa.eu/covid19/casedistribution")
   )
-
 ```
 
 # Feedback
 
-Gerne möchte ich Ihnen ein kurzes Feedback zu dem Kurs geben. Zunächst einmal habe ich vieles gelernt, was mir tatsächlich auch in anderen Kursen geholfen hat, Aufgaben in R schneller zu bewältigen. Allerdings fand ich insbesondere das Kapitel 3 sehr schwer verständlich für jemanden ohne jegliche Programmierkenntnisse - was laut Kursbeschreibung nicht benötigt war. Ich war bereits kurz davor, den Kurs abzubrechen, habe dann aber mit den Kapiteln 4 und 5 weitergemacht und das dritte Kapitel zunächst übersprungen. Vielleicht könnte dieses genauer beschrieben oder vereinfacht werden. Uns steht selbstverständlich Matterhorn zur Verfügung, allerdings war das Kapitel einfach zu überwältigend mit den vielen neuen Begriffen etc., dass ich gar nicht wusste, nach was ich fragen sollte. 
+_Gerne möchte ich Ihnen zuletzt ein kurzes Feedback geben. Zunächst einmal habe ich vieles gelernt, was mir auch in anderen Kursen geholfen hat, Aufgaben in R schneller zu bewältigen. 
+Allerdings fand ich insbesondere das Kapitel 3 sehr schwer verständlich für jemanden ohne jegliche Programmierkenntnisse - was laut Kursbeschreibung nicht benötigt war. Ich war bereits kurz davor, den Kurs abzubrechen, habe dann aber mit den Kapiteln 4 und 5 weitergemacht und das dritte Kapitel zunächst übersprungen. Vielleicht könnte dieses genauer beschrieben oder vereinfacht werden. Uns steht selbstverständlich Matterhorn zur Verfügung, allerdings war das Kapitel einfach zu überwältigend mit den vielen neuen Begriffen etc., dass ich gar nicht wusste, nach was ich fragen sollte. 
 Auch das Kapitel 1 mit der Installation ist teilweise schwer verständlich. Ich wusste zum Beispiel noch nicht mal was "mein Terminal" ist und hatte so bei der Installation Probleme. 
-Letztlich habe ich fast alle Aufgaben gemeistert mit nicht unerheblichem Zeitaufwand. Das war einer der Gründe, weshalb ich mich zuletzt auch aus dem Nachfolgekurs "Machine Learning" wieder ausgetragen habe. 
+Im Kapitel 4 war ich gezwungen Matlab zu deinstallieren aufgrund der großen Datenmengen und alles weitere mit R auf einer externen Festplatte laufen zu lassen. Natürlich liegt das teilweise auch an meinem etwas alten Laptop, andererseits wäre es wohl einfacher gewesen, die verkleinerten / gekürzten Daten direkt zur Verfügung zu stellen. Man hat hier schon viel Zeit verloren mit dem Warten auf Ergebnisse - das mag zwar realitätsnaher sein, aber ob der Code funktioniert oder nicht, erkennt man ja auch mit weniger Daten. 
+Letztlich habe ich fast alle Aufgaben gemeistert - allerdings mit nicht unerheblichem Zeitaufwand. Das war einer der Gründe, weshalb ich mich zuletzt auch aus dem Nachfolgekurs "Machine Learning" wieder ausgetragen habe. Vielleicht gehe ich das Thema in einem zukünftigen Semester nochmal an. Vielen Dank auch für die Hilfe in Mattermost - oft sind es wahrhaft Kleinigkeiten, die einem die Zeit stehlen, weil man einfach nicht den Fehler findet. 
+Damit eine schöne Weihnachtszeit! 
+Kristin Schüler_
